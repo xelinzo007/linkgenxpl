@@ -156,7 +156,7 @@ async def process_message(event):
 
 @bot_client.on(events.NewMessage(chats=source_channel_id))
 async def handler(event):
-    if event.is_group:
+    if event:
         try:
             await message_queue.put(event)
         except Exception as e:
