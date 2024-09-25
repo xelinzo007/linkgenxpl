@@ -10,11 +10,11 @@ from asyncio import Queue
 # Replace these values with your own
 api_id = 20870301
 api_hash = 'ea27e2de02e64bd057473f07031b30f0'
-bot_token = '7265352270:AAFmhjFRwKfL8Eu8DJoQQ9AL7YrOamgVhx0'
+bot_token = '7962279111:AAHZScdqIOLnYp93Ho_cHmh__GQEv9PUmLI'
 
 # Replace with your channel IDs or usernames
-source_channel_id = ''  # Channel to read messages from
-target_channel_id = ''  # Channel to send the final processed message to
+source_channel_id = -1001302730016 # Channel to read messages from
+target_channel_id = -1002149047543  # Channel to send the final processed message to
 
 # Configure logging
 logging.basicConfig(
