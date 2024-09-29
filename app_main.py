@@ -33,20 +33,6 @@ userbot_client = TelegramClient('userbot', api_id, api_hash)
 # Queue for message processing
 message_queue = Queue()
 
-async def fetch_and_forward_messages():
-    await userbot_client.start()
-    logger.info("Userbot client started")
-
-    async for message in userbot_client.iter_messages(source_channel_id):
-        try:
-            # Send the message to the target channel
-            await bot_client.send_message(target_channel_id, message.message)
-            logger.info(f"Sent message ID {message.id} to target channel.")
-            # Wait for 10 seconds before sending the next message
-            await sleep(10)
-        except Exception as e:
-            logger.error(f"Error while sending message ID {message.id}: {e}")
-
 async def get_extra_pe_bot_response(url):
     try:
         async with userbot_client.conversation(2015117555) as conv:
@@ -66,7 +52,6 @@ def encode_url(url):
 
 def is_amazon_url(url):
     try:
-        # Regex pattern to match various Amazon-related URLs
         amazon_pattern = re.compile(r'(amzn\.to|amzn\.in|amazon\.com|amazon\.(?:co|ca|de|fr|it|jp|es|uk)|amazon\.in)')
         return bool(amazon_pattern.search(url))
     except Exception as e:
@@ -76,25 +61,17 @@ def is_amazon_url(url):
 async def get_short_url(long_url):
     try:
         parsed_url = urlparse(long_url)
-        # Parse query parameters
         query_params = parse_qs(parsed_url.query)
-        # Update the query parameters
         query_params['tag'] = 'sujithraman-21'
-        # Rebuild the URL with updated query parameters
         new_query = urlencode(query_params, doseq=True)
         new_url = urlunparse(parsed_url._replace(query=new_query))
         encoded_url = encode_url(new_url)
 
         async with httpx.AsyncClient() as clientx:
-            try:
-                response = await clientx.get(f'https://www.amazon.in/associates/sitestripe/getShortUrl?longUrl={encoded_url}&marketplaceId=44571')
-                response.raise_for_status()
-                data = response.json()
-                return data.get('longUrl', new_url)
-            except httpx.HTTPStatusError as http_err:
-                logger.error(f"HTTP error occurred: {http_err}")
-            except httpx.RequestError as req_err:
-                logger.error(f"Request error occurred: {req_err}")
+            response = await clientx.get(f'https://www.amazon.in/associates/sitestripe/getShortUrl?longUrl={encoded_url}&marketplaceId=44571')
+            response.raise_for_status()
+            data = response.json()
+            return data.get('longUrl', new_url)
     except Exception as e:
         logger.error(f"Error while getting short URL for {long_url}: {e}")
     return new_url
@@ -107,6 +84,7 @@ async def process_message(event):
         urls = []
         url_pattern = re.compile(r'https?://[^\s]+')
         urls = url_pattern.findall(message)
+        
         # Filter Amazon URLs
         amazon_urls = [url for url in urls if is_amazon_url(url)]
         if len(amazon_urls) > 15:
@@ -124,27 +102,19 @@ async def process_message(event):
                     if extra_pe_bot_response:
                         message = message.replace(url, f'<a href="{extra_pe_bot_response}">🛒 Buy Now</a>')
                     continue
+                
                 async with httpx.AsyncClient(follow_redirects=True) as client:
-                    try:
-                        # Follow redirects and get the final URL
-                        response = await client.get(url)
-                        final_url = response.url
-                        # Check if the final URL is an Amazon URL
-                        if is_amazon_url(str(final_url)):
-                            # Process Amazon URL
-                            short_url = await get_short_url(str(final_url))
-                            if short_url:
-                                message = message.replace(url, f'<a href="{short_url}">🛒 Buy Now</a>')
-                        else:
-                            # For non-Amazon URLs, get response from ExtraPeBot
-                            extra_pe_bot_response = await get_extra_pe_bot_response(str(final_url))
-                            if extra_pe_bot_response:
-                                message = message.replace(url, f'<a href="{extra_pe_bot_response}">🛒 Buy Now</a>')
+                    response = await client.get(url)
+                    final_url = response.url
 
-                    except httpx.HTTPStatusError as http_err:
-                        logger.error(f"HTTP error occurred while processing URL {url}: {http_err}")
-                    except httpx.RequestError as req_err:
-                        logger.error(f"Request error occurred while processing URL {url}: {req_err}")
+                    if is_amazon_url(str(final_url)):
+                        short_url = await get_short_url(str(final_url))
+                        if short_url:
+                            message = message.replace(url, f'<a href="{short_url}">🛒 Buy Now</a>')
+                    else:
+                        extra_pe_bot_response = await get_extra_pe_bot_response(str(final_url))
+                        if extra_pe_bot_response:
+                            message = message.replace(url, f'<a href="{extra_pe_bot_response}">🛒 Buy Now</a>')
 
             except Exception as e:
                 logger.error(f"Error while processing URL {url}: {e}")
@@ -156,11 +126,8 @@ async def process_message(event):
 
         # Handle media (optional)
         if isinstance(media, MessageMediaWebPage):
-            # Extract URL from the web page media
-            webpage_url = media.webpage.url if media.webpage else 'No URL found'
             await bot_client.send_message(target_channel_id, bold_message, parse_mode='html')
         elif media:
-            # Handle file media (photos, documents, etc.)
             await bot_client.send_message(target_channel_id, bold_message, parse_mode='html', file=media)
 
     except Exception as e:
@@ -179,6 +146,7 @@ async def message_processor():
         try:
             event = await message_queue.get()
             await process_message(event)
+            await sleep(10)  # Wait 10 seconds between processing each message
         except Exception as e:
             logger.error(f"Error while processing message from queue: {e}")
         finally:
