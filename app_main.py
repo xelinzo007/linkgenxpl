@@ -5,7 +5,7 @@ from telethon import TelegramClient, events
 from telethon.tl.types import MessageMediaWebPage
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import urllib.parse
-from asyncio import Queue
+from asyncio import Queue, sleep
 
 # Replace these values with your own
 api_id = 20870301
@@ -13,7 +13,7 @@ api_hash = 'ea27e2de02e64bd057473f07031b30f0'
 bot_token = '7962279111:AAHZScdqIOLnYp93Ho_cHmh__GQEv9PUmLI'
 
 # Replace with your channel IDs or usernames
-source_channel_id = -1001302730016 # Channel to read messages from
+source_channel_id = -1001302730016  # Channel to read messages from
 target_channel_id = -1002149047543  # Channel to send the final processed message to
 
 # Configure logging
@@ -32,6 +32,20 @@ userbot_client = TelegramClient('userbot', api_id, api_hash)
 
 # Queue for message processing
 message_queue = Queue()
+
+async def fetch_and_forward_messages():
+    await userbot_client.start()
+    logger.info("Userbot client started")
+
+    async for message in userbot_client.iter_messages(source_channel_id):
+        try:
+            # Send the message to the target channel
+            await bot_client.send_message(target_channel_id, message.message)
+            logger.info(f"Sent message ID {message.id} to target channel.")
+            # Wait for 10 seconds before sending the next message
+            await sleep(10)
+        except Exception as e:
+            logger.error(f"Error while sending message ID {message.id}: {e}")
 
 async def get_extra_pe_bot_response(url):
     try:
@@ -58,7 +72,6 @@ def is_amazon_url(url):
     except Exception as e:
         logger.error(f"Error while checking if URL is Amazon: {e}")
         return False
-
 
 async def get_short_url(long_url):
     try:
@@ -106,7 +119,7 @@ async def process_message(event):
                 parsed_url = httpx.URL(url)
                 domain = parsed_url.host
 
-                if domain in ['fkrt.cc', 'fkrt.to','fas.st','cutt.ly','extp.in','myntr.in','mynt.ro','fkrt.it']:
+                if domain in ['fkrt.cc', 'fkrt.to', 'fas.st', 'cutt.ly', 'extp.in', 'myntr.in', 'mynt.ro', 'fkrt.it']:
                     extra_pe_bot_response = await get_extra_pe_bot_response(url)
                     if extra_pe_bot_response:
                         message = message.replace(url, f'<a href="{extra_pe_bot_response}">🛒 Buy Now</a>')
@@ -153,14 +166,13 @@ async def process_message(event):
     except Exception as e:
         logger.error(f"Error while processing message {event.message.id}: {e}")
 
-
-@bot_client.on(events.NewMessage(chats=source_channel_id))
+@userbot_client.on(events.NewMessage(chats=source_channel_id))
 async def handler(event):
-    if event:
-        try:
-            await message_queue.put(event)
-        except Exception as e:
-            logger.error(f"Error while adding message to queue: {e}")
+    logger.info(f"New message from source channel: {event.message.id}")
+    try:
+        await message_queue.put(event)
+    except Exception as e:
+        logger.error(f"Error while adding message to queue: {e}")
 
 async def message_processor():
     while True:
@@ -175,11 +187,13 @@ async def message_processor():
 # Start the background task for processing messages
 bot_client.loop.create_task(message_processor())
 
+# Run the fetching and forwarding function
+with userbot_client:
+    userbot_client.loop.run_until_complete(fetch_and_forward_messages())
+
 # Run the clients
 logger.info("Starting bot clients")
 try:
-    bot_client.start()
-    userbot_client.start()
     bot_client.run_until_disconnected()
 except Exception as e:
     logger.error(f"Error while running bot clients: {e}")
